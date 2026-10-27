@@ -15,6 +15,26 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **Timed group-history sends**: when `requireMention` is `false`, buffered group history is sent at each `groupIntervalTimer` interval and when the bot is mentioned.
 - **Group image history**: group history now retains image metadata, original URLs and successful local download paths; unmentioned group images are preloaded before mention gating, so later mentions and timed batches can use the local path, with URL fallback on download failure.
 
+## [0.5.3] - 2026-10-27
+
+### Added
+
+- **Streaming replies**: replies stream to QQ in segments while the model generates, and an automatic LLM retry rewrites the same streamed message instead of appending a duplicate. Streaming had never actually worked; it does now.
+- **Delivered files reach the chat**: files the model declares as deliverables are automatically sent to the current QQ conversation right after the turn's reply, with a text notice when a file cannot be sent; can be disabled or capped in configuration.
+
+### Fixed
+
+- **Action confirmation restored**: confirmation requests never arrived — sensitive operations kept failing with "no approval channel is available". Fixed. (#51, thanks to [@IrisuM](https://github.com/IrisuM))
+- **Settings panel input and copy**: allowlist textareas accept newlines, normalized on save; option labels such as open/disabled read more plainly.
+
+### Metadata
+
+- **Plugin metadata completed**: ships a plugin icon and a bilingual description; the plugin list shows “QQ 机器人 (dsh-qqbot)” / “QQ Bot (dsh-qqbot)” by interface language.
+- **Entries and icon**: the sidebar and the plugin detail page gain management-panel entries; the settings panel icon becomes a vector logo.
+
+### Documentation
+
+- README: Desktop installation instructions — add from the Plugins page, connect by scanning in Settings, no command line involved.
 
 ## [0.5.2] - 2026-10-12
 
