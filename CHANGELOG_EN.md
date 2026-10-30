@@ -6,6 +6,12 @@ This file records significant dsh-qqbot updates from a product perspective, focu
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [Unreleased]
+
+### New Features
+
+- **Message timestamps**: inbound QQ DM/group messages and buffered group history now carry RFC 3339 UTC+8 timestamps (`YYYY-MM-DDTHH:mm:ss+08:00`), helping the model understand message ordering and gaps; missing or invalid timestamps are omitted.
+
 ## [0.5.4] - 2026-10-28
 
 ### New Features

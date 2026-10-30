@@ -6,6 +6,12 @@
 
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)。
 
+## [Unreleased]
+
+### 新功能
+
+- **消息时间戳**：QQ 私聊/群聊的入站消息和群历史缓存现在都带 RFC 3339 东八区时间戳（`YYYY-MM-DDTHH:mm:ss+08:00`），便于模型理解消息先后与间隔；时间戳缺失或非法时自动省略。
+
 ## [0.5.4] - 2026-10-28
 
 ### 新功能
