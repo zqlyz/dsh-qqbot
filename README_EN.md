@@ -107,7 +107,7 @@ npx @deepseek-ai/dsh web --patch /path/to/dsh-qqbot/cordis.dev.yml
 | `sessionIdleTimeout` | number | `1800000` | Session idle timeout (ms), default 30 min |
 | `processingTimeoutMs` | number | `1800000` | Processing timeout (ms), aborts the current LLM call |
 | `maxQueue` | number | `20` | Max concurrent queue length |
-| `historyLimit` | number | `10` | Group history buffer size |
+| `historyLimit` | number | `10` | Group history buffer size (cached messages retain downloaded media) |
 | `askTimeoutMs` | number | `300000` | Question timeout (ms), default 5 min (ask_user_question) |
 | `showToolResults` | boolean | `false` | Show successful tool-call results (errors always shown) |
 | `debug` | boolean | `false` | Debug mode |
@@ -128,6 +128,8 @@ npx @deepseek-ai/dsh web --patch /path/to/dsh-qqbot/cordis.dev.yml
 | `media.enabled` | boolean | `true` | Enable rich media understanding (image/video download + tool analysis) |
 | `media.maxMB` | number | `200` | Max download size (MB) |
 | `media.ttlHours` | number | `24` | Media lifetime (hours), 0 = never expire |
+
+Buffered group history downloads and records images/videos/files as messages arrive; when the bot is later @-mentioned, the model sees their local paths in the history context (falling back to URL/filename after cleanup). Disabling `media.enabled` removes media from history.
 
 ### Vision (vision)
 

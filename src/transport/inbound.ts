@@ -10,6 +10,7 @@
  */
 import type { ContentBlock } from '@deepseek-ai/dsh-llm';
 import { createUserMessage } from '@deepseek-ai/dsh-llm';
+import { existsSync } from 'node:fs';
 import type { SessionManager } from '../session/index.ts';
 import type { ImQQBotConfig } from '../config.ts';
 import type { ChatScope, Logger, QuotedAttachment, RawAttachment, ReplyTarget } from '../types.ts';
@@ -20,6 +21,7 @@ import {
   type MediaKind,
 } from './attachment.ts';
 import { clearGroupHistory } from '../features/history-store.ts';
+import type { CachedHistoryEntry, CachedHistoryMedia } from '../features/history-store.ts';
 import type { MiddlewareContext } from '@tencent-connect/qqbot-nodejs';
 
 // ── 类型定义 ──
@@ -44,21 +46,13 @@ interface ResolvedQuote {
   attachments?: QuotedAttachment[];
 }
 
-interface HistoryEntry {
-  senderId: string;
-  senderName?: string;
-  content: string;
-  timestamp: number;
-  messageId: string;
-}
-
 interface MentionState {
   wasMentioned?: boolean;
 }
 
 interface MiddlewareState {
   quote?: ResolvedQuote;
-  history?: HistoryEntry[];
+  history?: CachedHistoryEntry[];
   envelope?: string;
   mention?: MentionState;
   processedAttachments?: ProcessedAttachment[];
@@ -351,7 +345,7 @@ function renderMediaLine(
  */
 function buildAgentBody(
   base: string,
-  history: HistoryEntry[] | undefined,
+  history: CachedHistoryEntry[] | undefined,
   isGroup: boolean,
   wasMentioned: boolean,
 ): string {
@@ -361,7 +355,9 @@ function buildAgentBody(
 
   const historyLines = history.map(h => {
     const name = h.senderName ?? shortSenderId(h.senderId);
-    return `${timestampTag(h.timestamp)}[${name} (${h.senderId})] ${h.content}`;
+    const line = `${timestampTag(h.timestamp)}[${name} (${h.senderId})] ${h.content}`;
+    const media = renderHistoryMedia(h.media);
+    return media ? `${line}\n${media}` : line;
   });
 
   return [
@@ -372,6 +368,21 @@ function buildAgentBody(
     '[Current message]',
     base,
   ].join('\n');
+}
+
+/**
+ * 历史条目的媒体行，缩进两格与当前消息的顶层媒体行区分。
+ * 本地文件可能已被 media.ttlHours 清理，缺失时回退到 URL/文件名/大小。
+ */
+function renderHistoryMedia(media?: CachedHistoryMedia[]): string {
+  if (!media || media.length === 0) return '';
+
+  return media
+    .map((m) => {
+      const localPath = m.localPath && existsSync(m.localPath) ? m.localPath : undefined;
+      return `  - ${renderMediaLine(m.kind, m.filename, localPath, m.url, m.size)}`;
+    })
+    .join('\n');
 }
 
 // ══════════════════════════════════════════════════════════════

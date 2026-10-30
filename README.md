@@ -107,7 +107,7 @@ npx @deepseek-ai/dsh web --patch /path/to/dsh-qqbot/cordis.dev.yml
 | `sessionIdleTimeout` | number | `1800000` | 会话闲置超时(ms)，默认 30 分钟 |
 | `processingTimeoutMs` | number | `1800000` | 处理超时(ms)，超时中断当前 LLM 调用 |
 | `maxQueue` | number | `20` | 并发队列最大长度 |
-| `historyLimit` | number | `10` | 群历史缓冲条数 |
+| `historyLimit` | number | `10` | 群历史缓冲条数（缓存消息附带已下载媒体） |
 | `askTimeoutMs` | number | `300000` | 待答问题超时(ms)，默认 5 分钟（ask_user_question） |
 | `showToolResults` | boolean | `false` | 是否展示工具调用成功结果（错误始终展示） |
 | `debug` | boolean | `false` | 调试模式 |
@@ -128,6 +128,8 @@ npx @deepseek-ai/dsh web --patch /path/to/dsh-qqbot/cordis.dev.yml
 | `media.enabled` | boolean | `true` | 是否启用富媒体理解（图片/视频下载 + 工具分析） |
 | `media.maxMB` | number | `200` | 富媒体下载大小上限(MB) |
 | `media.ttlHours` | number | `24` | 富媒体存活时长(小时)，0=永不过期 |
+
+群历史缓存会在消息入站时下载并记录图片/视频/文件；之后被 @ 时，模型可在历史上下文中看到这些媒体的本地路径（文件已清理时回退为链接/文件名）。关闭 `media.enabled` 后历史不再附带媒体。
 
 ### 视觉理解（vision）
 
