@@ -10,6 +10,7 @@
  */
 import type { ContentBlock } from '@deepseek-ai/dsh-llm';
 import { createUserMessage } from '@deepseek-ai/dsh-llm';
+import { existsSync } from 'node:fs';
 import type { SessionManager } from '../session/index.ts';
 import type { ImQQBotConfig } from '../config.ts';
 import type { ChatScope, Logger, QuotedAttachment, RawAttachment, ReplyTarget } from '../types.ts';
@@ -20,6 +21,7 @@ import {
   type MediaKind,
 } from './attachment.ts';
 import { clearGroupHistory } from '../features/history-store.ts';
+import type { CachedHistoryEntry, CachedHistoryMedia } from '../features/history-store.ts';
 import type { MiddlewareContext } from '@tencent-connect/qqbot-nodejs';
 
 // ── 类型定义 ──
@@ -44,21 +46,13 @@ interface ResolvedQuote {
   attachments?: QuotedAttachment[];
 }
 
-interface HistoryEntry {
-  senderId: string;
-  senderName?: string;
-  content: string;
-  timestamp: number;
-  messageId: string;
-}
-
 interface MentionState {
   wasMentioned?: boolean;
 }
 
 interface MiddlewareState {
   quote?: ResolvedQuote;
-  history?: HistoryEntry[];
+  history?: CachedHistoryEntry[];
   envelope?: string;
   mention?: MentionState;
   processedAttachments?: ProcessedAttachment[];
@@ -171,7 +165,15 @@ function assembleAgentBody(
   if (isEmptyMessage(userContent, msg.attachments, isGroup, wasMentioned)) return null;
 
   const quotePart = buildQuotePart(state.quote);
-  const userMessage = buildUserMessage(userContent, quotePart, msg.senderId, msg.senderName, isGroup, wasMentioned);
+  const userMessage = buildUserMessage(
+    userContent,
+    quotePart,
+    msg.senderId,
+    msg.senderName,
+    isGroup,
+    wasMentioned,
+    msg.timestamp,
+  );
 
   const dynamicCtx = buildDynamicCtx(msg, state);
 
@@ -246,15 +248,17 @@ function buildUserMessage(
   senderName: string | undefined,
   isGroup: boolean,
   wasMentioned: boolean,
+  timestamp: string | undefined,
 ): string {
+  const tsTag = timestampTag(timestamp);
   if (!isGroup) {
-    return `${quotePart}${userContent}`;
+    return `${quotePart}${tsTag}${userContent}`;
   }
 
   const mentionTag = wasMentioned ? ' (@you)' : '';
   const displayName = senderName ?? shortSenderId(senderId);
   const senderTag = `[${displayName} (${senderId})]`;
-  return `${quotePart}${senderTag} ${userContent}${mentionTag}`;
+  return `${quotePart}${tsTag}${senderTag} ${userContent}${mentionTag}`;
 }
 
 /**
@@ -341,7 +345,7 @@ function renderMediaLine(
  */
 function buildAgentBody(
   base: string,
-  history: HistoryEntry[] | undefined,
+  history: CachedHistoryEntry[] | undefined,
   isGroup: boolean,
   wasMentioned: boolean,
 ): string {
@@ -351,7 +355,9 @@ function buildAgentBody(
 
   const historyLines = history.map(h => {
     const name = h.senderName ?? shortSenderId(h.senderId);
-    return `[${name} (${h.senderId})] ${h.content}`;
+    const line = `${timestampTag(h.timestamp)}[${name} (${h.senderId})] ${h.content}`;
+    const media = renderHistoryMedia(h.media);
+    return media ? `${line}\n${media}` : line;
   });
 
   return [
@@ -362,6 +368,21 @@ function buildAgentBody(
     '[Current message]',
     base,
   ].join('\n');
+}
+
+/**
+ * 历史条目的媒体行，缩进两格与当前消息的顶层媒体行区分。
+ * 本地文件可能已被 media.ttlHours 清理，缺失时回退到 URL/文件名/大小。
+ */
+function renderHistoryMedia(media?: CachedHistoryMedia[]): string {
+  if (!media || media.length === 0) return '';
+
+  return media
+    .map((m) => {
+      const localPath = m.localPath && existsSync(m.localPath) ? m.localPath : undefined;
+      return `  - ${renderMediaLine(m.kind, m.filename, localPath, m.url, m.size)}`;
+    })
+    .join('\n');
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -442,6 +463,21 @@ function formatFileSize(bytes: number): string {
 
 /** 发送者短标识长度（openid 前 N 位，无昵称时兜底） */
 const SENDER_SHORT_ID_LEN = 8;
+
+/**
+ * SDK 自带时间戳：当前消息为 ISO 字符串，群历史为毫秒数。
+ * 两者统一按 QQ 常用时区输出为 `YYYY-MM-DDTHH:mm:ss+08:00`；缺失或非法时省略。
+ */
+const TIMESTAMP_OFFSET_MS = 8 * 60 * 60 * 1000;
+
+function timestampTag(value?: string | number): string {
+  const raw = typeof value === 'string' ? value.trim() : value;
+  if (raw === undefined || raw === '') return '';
+  const date = new Date(raw);
+  if (Number.isNaN(date.getTime())) return '';
+  const iso = new Date(date.getTime() + TIMESTAMP_OFFSET_MS).toISOString();
+  return `[${iso.slice(0, 19)}+08:00] `;
+}
 
 /** 无昵称时用 openid 前 N 位作为匿名标识 */
 function shortSenderId(senderId: string): string {

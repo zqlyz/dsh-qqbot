@@ -6,6 +6,13 @@ This file records significant dsh-qqbot updates from a product perspective, focu
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [Unreleased]
+
+### New Features
+
+- **Message timestamps**: inbound QQ DM/group messages and buffered group history now carry RFC 3339 UTC+8 timestamps (`YYYY-MM-DDTHH:mm:ss+08:00`), helping the model understand message ordering and gaps; missing or invalid timestamps are omitted.
+- **Media in group history**: images/videos/files in group messages (including messages that do not @ the bot) are downloaded on arrival and cached with the message; when the bot is later @-mentioned, the model sees their local paths in the history context (falling back to URL/filename if the file has been cleaned up). Downloads follow `media.enabled`, `media.maxMB` and `media.ttlHours`; no new config option.
+
 ## [0.5.5] - 2026-10-30
 
 ### Fixed

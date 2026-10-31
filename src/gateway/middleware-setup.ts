@@ -24,6 +24,7 @@ import type { SessionManager } from '../session/index.ts';
 import type { Logger } from '../types.ts';
 import { buildCommandList } from '../commands/index.ts';
 import { attachmentProcessor } from '../middleware/attachment.ts';
+import { historyMediaProcessor } from '../middleware/history-media.ts';
 import { questionAnswer } from '../middleware/question-answer.ts';
 import { getHistoryStore, historyGroupKey } from '../features/history-store.ts';
 
@@ -68,6 +69,10 @@ export function setupMiddlewares(
       return historyGroupKey(config.appId, gid);
     },
   }));
+
+  // 4.5. 群历史媒体 — 必须在门控之前，未 @bot 的群消息也要缓存图片/视频/文件；
+  //      必须在 historyBuffer 之后，才能把下载结果挂到对应缓存条目上。
+  bot.use(historyMediaProcessor(config, logger));
 
   // 5. 群聊 @bot 门控
   bot.use(mentionGate({
