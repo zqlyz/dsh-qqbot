@@ -60,6 +60,25 @@ class GroupHistoryStore implements HistoryStore {
     this.buffers.delete(groupKey);
   }
 
+  /**
+   * 原子取走某群的缓存（取出即清空）。
+   *
+   * 定时批量发送使用：先同步取快照并清空，再异步交由 agent 处理，
+   * 这样发射期间新到的消息会进入下一轮缓存，不会被本轮清理误删。
+   */
+  take(groupKey: string, limit: number): CachedHistoryEntry[] {
+    const buf = this.buffers.get(groupKey);
+    if (!buf) return [];
+    const taken = buf.slice(-limit);
+    this.buffers.delete(groupKey);
+    return taken;
+  }
+
+  /** 当前有缓存的群 key 快照（定时器遍历用）。 */
+  keys(): string[] {
+    return [...this.buffers.keys()];
+  }
+
   /** 把媒体挂到某条已缓存消息上；条目不存在或已被淘汰时静默忽略 */
   attachMedia(groupKey: string, messageId: string, media: CachedHistoryMedia[]): void {
     if (media.length === 0) return;

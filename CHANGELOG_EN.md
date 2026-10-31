@@ -12,6 +12,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 - **Message timestamps**: inbound QQ DM/group messages and buffered group history now carry RFC 3339 UTC+8 timestamps (`YYYY-MM-DDTHH:mm:ss+08:00`), helping the model understand message ordering and gaps; missing or invalid timestamps are omitted.
 - **Media in group history**: images/videos/files in group messages (including messages that do not @ the bot) are downloaded on arrival and cached with the message; when the bot is later @-mentioned, the model sees their local paths in the history context (falling back to URL/filename if the file has been cleaned up). Downloads follow `media.enabled`, `media.maxMB` and `media.ttlHours`; no new config option.
+- **Scheduled batch replies in groups**: with "only reply when @-mentioned" disabled, group messages that do not @ the bot are buffered instead of answered one by one; every `historyIntervalTimer` seconds (default 180, configurable 30–3600) the buffered messages are fed to the agent as one batch. @-mentions are still handled immediately with the buffered history attached, regardless of the timer. The buffer is cleared after each send, and messages arriving during a send are kept for the next round; the interval is editable in the settings panel under Basic Settings, with invalid values falling back to 180 seconds.
 
 ## [0.5.5] - 2026-10-30
 

@@ -90,6 +90,76 @@ describe('handleInbound timestamps', () => {
     );
   });
 
+  it('includes buffered history for a timer batch even without @bot', async () => {
+    const body = await run(
+      {
+        rawEventType: 'GROUP_MESSAGE_CREATE',
+        kind: 'group',
+        senderId: 'sender-a',
+        senderName: 'Alice',
+        content: 'latest',
+        messageId: 'm2',
+        timestamp: '2026-01-02T03:04:05+08:00',
+        groupOpenid: 'group-a',
+      },
+      {
+        mention: { wasMentioned: false },
+        historyBatch: true,
+        history: [
+          {
+            senderId: 'sender-b',
+            senderName: 'Bob',
+            content: 'earlier',
+            timestamp: Date.parse('2026-01-01T18:59:58.000Z'),
+            messageId: 'm1',
+          },
+        ],
+      },
+    );
+
+    expect(body).toBe(
+      [
+        '[Chat history begins]',
+        '[2026-01-02T02:59:58+08:00] [Bob (sender-b)] earlier',
+        '',
+        '[Chat history ends]',
+        '[Current message]',
+        '[2026-01-02T03:04:05+08:00] [Alice (sender-a)] latest',
+      ].join('\n'),
+    );
+  });
+
+  it('still flushes a timer batch when the latest message has no content', async () => {
+    const body = await run(
+      {
+        rawEventType: 'GROUP_MESSAGE_CREATE',
+        kind: 'group',
+        senderId: 'sender-a',
+        senderName: 'Alice',
+        content: '',
+        messageId: 'm2',
+        timestamp: '2026-01-02T03:04:05+08:00',
+        groupOpenid: 'group-a',
+      },
+      {
+        mention: { wasMentioned: false },
+        historyBatch: true,
+        history: [
+          {
+            senderId: 'sender-b',
+            senderName: 'Bob',
+            content: 'earlier',
+            timestamp: Date.parse('2026-01-01T18:59:58.000Z'),
+            messageId: 'm1',
+          },
+        ],
+      },
+    );
+
+    expect(body).toContain('[Chat history begins]');
+    expect(body).toContain('[Bob (sender-b)] earlier');
+  });
+
   it('puts the current timestamp after the quote block', async () => {
     const timestamp = '2026-01-01T19:04:05.000Z';
 

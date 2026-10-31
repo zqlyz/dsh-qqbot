@@ -30,6 +30,7 @@ function entry(messageId: string, content = 'hello') {
 
 beforeEach(() => {
   clearGroupHistory(APP_ID, GROUP_ID);
+  clearGroupHistory(APP_ID, 'other-group');
 });
 
 describe('GroupHistoryStore', () => {
@@ -53,6 +54,27 @@ describe('GroupHistoryStore', () => {
 
     store.attachMedia(KEY, 'm1', [image]);
     expect(store.list(KEY, 10)[0]!.media).toEqual([image]);
+  });
+
+  it('take returns the latest entries and clears the group atomically', () => {
+    const store = getHistoryStore();
+    store.append(KEY, entry('m1'), 10);
+    store.append(KEY, entry('m2'), 10);
+
+    expect(store.take(KEY, 1).map(e => e.messageId)).toEqual(['m2']);
+    expect(store.list(KEY, 10)).toEqual([]);
+    expect(store.take(KEY, 10)).toEqual([]);
+  });
+
+  it('keys lists groups with buffered history', () => {
+    const store = getHistoryStore();
+    store.append(KEY, entry('m1'), 10);
+    store.append(historyGroupKey(APP_ID, 'other-group'), entry('m2'), 10);
+
+    expect(store.keys().sort()).toEqual([
+      historyGroupKey(APP_ID, 'other-group'),
+      KEY,
+    ].sort());
   });
 
   it('clearGroupHistory removes both entries and attached media', () => {

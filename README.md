@@ -100,6 +100,7 @@ npx @deepseek-ai/dsh web --patch /path/to/dsh-qqbot/cordis.dev.yml
 | `preset` | string | - | Agent preset id |
 | `cwd` | string | `process.cwd()` | Agent 工作目录 |
 | `requireMention` | boolean | `true` | 群聊是否需要 @bot 才触发 |
+| `historyIntervalTimer` | number | `180` | 群历史缓存定时发送间隔(秒)，30–3600；仅 `requireMention=false` 时生效，非法值回退 180 |
 | `groupPrompt` | string | - | 群聊额外 system prompt |
 | `directPrompt` | string | - | 私聊额外 system prompt |
 | `textChunkLimit` | number | `4500` | 单条消息最大字符数 |
@@ -130,6 +131,8 @@ npx @deepseek-ai/dsh web --patch /path/to/dsh-qqbot/cordis.dev.yml
 | `media.ttlHours` | number | `24` | 富媒体存活时长(小时)，0=永不过期 |
 
 群历史缓存会在消息入站时下载并记录图片/视频/文件；之后被 @ 时，模型可在历史上下文中看到这些媒体的本地路径（文件已清理时回退为链接/文件名）。关闭 `media.enabled` 后历史不再附带媒体。
+
+当 `requireMention=false` 时，未被 @ 的群消息只进入历史缓存，不立即回复；插件每 `historyIntervalTimer` 秒检查一次缓存，非空则整批交给 agent 回复并清空。被 @ 的消息仍会立即处理（同时携带缓存历史并清空），不受计时器限制。
 
 ### 视觉理解（vision）
 

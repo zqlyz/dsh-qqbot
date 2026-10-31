@@ -16,6 +16,8 @@ import { resolveReplyTarget, sendResolvedMarkdown } from '../transport/reply-tar
 import type { ToolsRegistryLike } from '../transport/tool-presenter.ts';
 import type { QQBotSender } from '../transport/outbound-buffer.ts';
 import { QuestionChannel } from '../features/question-channel.ts';
+import { GroupHistoryBatcher } from '../features/history-batcher.ts';
+import { historyGroupKey } from '../features/history-store.ts';
 import { ApprovalChannel, type ApprovalChannelContext } from '../features/approval-channel.ts';
 import { decodeButtonData } from '../features/button-utils.ts';
 import { buildUserAgent } from '../shared/index.ts';
@@ -67,6 +69,12 @@ export async function bootstrapGateway(
   setupMiddlewares(bot, config, manager, logger);
 
   // ── 入站：经过中间件链后的消息交给 dsh agent ──
+  // requireMention=false 时，未 @bot 的群消息只缓存，由定时器批量发送；
+  // @bot 消息仍即时处理（保留 @ 门控），并取消该群待发送批次。
+  const historyBatcher = config.requireMention === false
+    ? new GroupHistoryBatcher(manager, config, logger)
+    : undefined;
+
   bot.on('message', async (mCtx: MiddlewareContext) => {
     const msg = mCtx.message;
     // 记录最近 msgId，供无上下文的出站发送（文件发送显式 target、主动推送等）获取被动回复目标
@@ -74,6 +82,21 @@ export async function bootstrapGateway(
     if (config.debug) {
       logger.debug(`← message (post-middleware): ${JSON.stringify(msg, null, 2).slice(0, 500)}`);
     }
+
+    if (historyBatcher !== undefined) {
+      const groupId = msg.kind === 'group' ? msg.groupOpenid : undefined;
+      if (groupId) {
+        const mentioned = (mCtx.state as { mention?: { wasMentioned?: boolean } })
+          .mention?.wasMentioned === true;
+        if (!mentioned) {
+          historyBatcher.buffer(mCtx);
+          if (config.debug) logger.debug(`history buffered: group=${groupId}`);
+          return;
+        }
+        historyBatcher.forget(historyGroupKey(config.appId, groupId));
+      }
+    }
+
     await handleInbound(mCtx, manager, config, logger);
   });
 
@@ -188,6 +211,7 @@ export async function bootstrapGateway(
   // ── 生命周期 ──
   (ctx as unknown as { effect(fn: () => (() => Promise<void>) | void, name?: string): void })
     .effect(() => {
+      historyBatcher?.start();
       logger.info(`Starting bot (appId=${config.appId})`);
       bot.start().catch((err: unknown) => {
         logger.error(`Bot start failed: ${err instanceof Error ? err.message : String(err)}`);
@@ -195,6 +219,7 @@ export async function bootstrapGateway(
 
       return async () => {
         logger.info('Shutting down');
+        historyBatcher?.stop();
         await manager.disposeAll();
         bot.stop();
       };

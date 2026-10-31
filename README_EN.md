@@ -100,6 +100,7 @@ npx @deepseek-ai/dsh web --patch /path/to/dsh-qqbot/cordis.dev.yml
 | `preset` | string | - | Agent preset id |
 | `cwd` | string | `process.cwd()` | Agent working directory |
 | `requireMention` | boolean | `true` | Whether group messages require @bot to trigger |
+| `historyIntervalTimer` | number | `180` | Group history flush interval in seconds, 30–3600; only effective when `requireMention=false`; invalid values fall back to 180 |
 | `groupPrompt` | string | - | Extra system prompt for group chats |
 | `directPrompt` | string | - | Extra system prompt for direct chats |
 | `textChunkLimit` | number | `4500` | Max chars per message |
@@ -130,6 +131,8 @@ npx @deepseek-ai/dsh web --patch /path/to/dsh-qqbot/cordis.dev.yml
 | `media.ttlHours` | number | `24` | Media lifetime (hours), 0 = never expire |
 
 Buffered group history downloads and records images/videos/files as messages arrive; when the bot is later @-mentioned, the model sees their local paths in the history context (falling back to URL/filename after cleanup). Disabling `media.enabled` removes media from history.
+
+When `requireMention=false`, group messages that do not @ the bot are only buffered, not answered immediately. Every `historyIntervalTimer` seconds the plugin checks each group's buffer and feeds a non-empty batch to the agent, then clears it. Messages that @ the bot are still processed immediately (with the buffered history attached and cleared), regardless of the timer.
 
 ### Vision (vision)
 

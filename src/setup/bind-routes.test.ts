@@ -353,6 +353,32 @@ describe('bind-routes', () => {
     expect(json(res)).toEqual({ ok: true, message: '配置已保存，插件将自动重载（进行中的机器人会话将重置）' });
   });
 
+  it('POST config：historyIntervalTimer 合法整数通过并写入', async () => {
+    const updates: Array<Record<string, unknown>> = [];
+    const { routes } = createHarness({
+      onUpdateConfig: (config) => { updates.push(config); return true; },
+    });
+    const res = fakeRes();
+    await invoke(
+      routes.get(BIND_CONFIG_PATH),
+      fakeReq('POST', { host: '127.0.0.1:3080', 'content-type': 'application/json' },
+        '{"historyIntervalTimer":120}'),
+      res,
+    );
+    expect(res.statusCode).toBe(200);
+    expect(updates).toEqual([{ historyIntervalTimer: 120 }]);
+  });
+
+  it('POST config：historyIntervalTimer 越界或非整数被拒绝', async () => {
+    for (const body of ['{"historyIntervalTimer":10}', '{"historyIntervalTimer":3601}', '{"historyIntervalTimer":180.5}']) {
+      const { routes } = createHarness();
+      const res = fakeRes();
+      await invoke(routes.get(BIND_CONFIG_PATH), fakeReq('POST', { host: '127.0.0.1:3080' }, body), res);
+      expect(res.statusCode).toBe(400);
+      expect(json(res)).toMatchObject({ ok: false, error: expect.stringContaining('historyIntervalTimer') });
+    }
+  });
+
   it('POST config：凭据字段被拒绝并引导绑定功能', async () => {
     const { routes } = createHarness();
     const res = fakeRes();

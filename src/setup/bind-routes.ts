@@ -19,7 +19,11 @@ import {
   type SetupCredentials,
 } from './persist.ts';
 import { getProfileDir } from '../shared/index.ts';
-import { AccessControlSchema } from '../config.ts';
+import {
+  AccessControlSchema,
+  HISTORY_INTERVAL_TIMER_MAX,
+  HISTORY_INTERVAL_TIMER_MIN,
+} from '../config.ts';
 import {
   BIND_CONFIG_PATH,
   BIND_MANUAL_PATH,
@@ -89,7 +93,7 @@ export interface BindRoutesOptions {
 
 /** 可经 UI 编辑的配置键（白名单：只收用户必要的字段，其余走 patch/env） */
 const EDITABLE_CONFIG_KEYS = new Set([
-  'requireMention', 'streaming', 'showToolResults', 'debug',
+  'requireMention', 'historyIntervalTimer', 'streaming', 'showToolResults', 'debug',
   'provider', 'model', 'preset',
   'groupPrompt', 'directPrompt',
   'access',
@@ -98,6 +102,12 @@ const EDITABLE_CONFIG_KEYS = new Set([
 /** 白名单键的子 Schema（服务端校验：客户端校验仅为体验，安全边界在宿主） */
 const EDITABLE_CONFIG_SCHEMAS: Record<string, (value: unknown) => unknown> = {
   requireMention: (v) => booleanSchema(v, 'requireMention'),
+  historyIntervalTimer: (v) => integerRangeSchema(
+    v,
+    'historyIntervalTimer',
+    HISTORY_INTERVAL_TIMER_MIN,
+    HISTORY_INTERVAL_TIMER_MAX,
+  ),
   streaming: (v) => booleanSchema(v, 'streaming'),
   showToolResults: (v) => booleanSchema(v, 'showToolResults'),
   debug: (v) => booleanSchema(v, 'debug'),
@@ -111,6 +121,21 @@ const EDITABLE_CONFIG_SCHEMAS: Record<string, (value: unknown) => unknown> = {
 
 function booleanSchema(value: unknown, name: string): boolean {
   if (typeof value !== 'boolean') throw new TypeError(`${name} 必须是布尔值`);
+  return value;
+}
+
+function integerRangeSchema(
+  value: unknown,
+  name: string,
+  min: number,
+  max: number,
+): number {
+  if (typeof value !== 'number' || !Number.isInteger(value)) {
+    throw new TypeError(`${name} 必须是整数秒`);
+  }
+  if (value < min || value > max) {
+    throw new TypeError(`${name} 必须在 ${min} 到 ${max} 秒之间`);
+  }
   return value;
 }
 

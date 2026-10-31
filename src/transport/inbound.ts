@@ -58,6 +58,8 @@ interface MiddlewareState {
   processedAttachments?: ProcessedAttachment[];
   downloadedFiles?: DownloadedFile[];
   downloadedQuoteFiles?: DownloadedFile[];
+  /** 定时批量发送：本批全部缓存作为历史，需绕过 wasMentioned 限制 */
+  historyBatch?: boolean;
   [key: string]: unknown;
 }
 
@@ -131,8 +133,9 @@ export async function handleInbound(
   record.agent.followup(message);
   logger.info(`→ followup sent: key=${scope}:${peerId}`);
 
-  // 群消息回复后清空历史缓存（避免下次 @ 时重复组包）
-  if (scope === 'group') {
+  // 群消息回复后清空历史缓存（避免下次 @ 时重复组包）。
+  // 定时批次在 take 时已清空，跳过这里以免误删批次发送期间新到的消息。
+  if (scope === 'group' && mwState.historyBatch !== true) {
     clearGroupHistory(config.appId, msg.groupOpenid ?? msg.senderId);
   }
 
@@ -162,7 +165,11 @@ function assembleAgentBody(
 
   const userContent = buildUserContent(msg, state, logger);
 
-  if (isEmptyMessage(userContent, msg.attachments, isGroup, wasMentioned)) return null;
+  // 定时批次即使最后一条为空（例如只 @ 了别人），也要把前面的历史交给 agent。
+  const batchHasHistory = state.historyBatch === true && (state.history?.length ?? 0) > 0;
+  if (isEmptyMessage(userContent, msg.attachments, isGroup, wasMentioned) && !batchHasHistory) {
+    return null;
+  }
 
   const quotePart = buildQuotePart(state.quote);
   const userMessage = buildUserMessage(
@@ -178,7 +185,13 @@ function assembleAgentBody(
   const dynamicCtx = buildDynamicCtx(msg, state);
 
   const base = dynamicCtx ? `${dynamicCtx}${userMessage}` : userMessage;
-  const agentBody = buildAgentBody(base, state.history, isGroup, wasMentioned);
+  const agentBody = buildAgentBody(
+    base,
+    state.history,
+    isGroup,
+    wasMentioned,
+    state.historyBatch === true,
+  );
 
   return agentBody;
 }
@@ -348,8 +361,9 @@ function buildAgentBody(
   history: CachedHistoryEntry[] | undefined,
   isGroup: boolean,
   wasMentioned: boolean,
+  historyBatch = false,
 ): string {
-  if (!isGroup || !wasMentioned || !history || history.length === 0) {
+  if (!isGroup || (!wasMentioned && !historyBatch) || !history || history.length === 0) {
     return base;
   }
 

@@ -85,6 +85,8 @@ export interface ImQQBotConfig {
   askTimeoutMs: number;
   /** 群历史缓冲条数 */
   historyLimit: number;
+  /** 群历史缓存定时发送间隔(秒)，仅 requireMention=false 时生效 */
+  historyIntervalTimer: number;
   /** 访问控制 */
   access: AccessControlConfig;
   /** 是否展示工具调用成功结果（工具错误始终展示） */
@@ -97,6 +99,21 @@ export interface ImQQBotConfig {
   vision: VisionConfig;
   /** 附件发送（qqbot_send_file 工具与交付物投递共用） */
   sendFile: SendFileConfig;
+}
+
+/** 群历史缓存定时发送间隔：默认 180 秒，允许 30–3600 秒 */
+export const HISTORY_INTERVAL_TIMER_DEFAULT = 180;
+export const HISTORY_INTERVAL_TIMER_MIN = 30;
+export const HISTORY_INTERVAL_TIMER_MAX = 3600;
+
+/** 把配置值收敛为合法间隔；非整数/越界/非数字一律回退默认值 */
+export function resolveHistoryIntervalTimer(value: unknown): number {
+  return typeof value === 'number'
+    && Number.isInteger(value)
+    && value >= HISTORY_INTERVAL_TIMER_MIN
+    && value <= HISTORY_INTERVAL_TIMER_MAX
+    ? value
+    : HISTORY_INTERVAL_TIMER_DEFAULT;
 }
 
 /** 访问控制子 Schema（独立导出：config 路由的服务端校验复用） */
@@ -124,6 +141,13 @@ export const ConfigSchema: Schema<ImQQBotConfig> = Schema.object({
   processingTimeoutMs: Schema.number().default(30 * 60 * 1000).description('处理超时(ms)，超时中断当前 LLM 调用'),
   askTimeoutMs: Schema.number().default(5 * 60 * 1000).description('待答问题超时(ms)，超时自动拒绝并提示'),
   historyLimit: Schema.number().default(10).description('群历史缓冲条数'),
+  historyIntervalTimer: Schema.number()
+    .min(HISTORY_INTERVAL_TIMER_MIN)
+    .max(HISTORY_INTERVAL_TIMER_MAX)
+    .step(1)
+    .default(HISTORY_INTERVAL_TIMER_DEFAULT)
+    .loose(true)
+    .description('群历史缓存定时发送间隔(秒，30-3600)；requireMention=false 时生效，非法值按默认 180'),
   access: AccessControlSchema.default({
     c2cMode: 'open',
     c2cAllow: [],

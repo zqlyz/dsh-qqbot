@@ -28,6 +28,7 @@ interface AccessControlWire {
 /** GET 回显的生效配置（appSecret 已剔除） */
 type ConfigWire = {
   requireMention?: boolean;
+  historyIntervalTimer?: number;
   streaming?: boolean;
   showToolResults?: boolean;
   debug?: boolean;
@@ -205,6 +206,34 @@ function FieldRow({ label, help, value, placeholder, onChange }: {
   );
 }
 
+/** 整数数值行（本地保留输入串，避免清空/半成品数字被父级状态吞掉） */
+function NumberRow({ label, help, value, min, max, step, onChange }: {
+  label: string; help?: string; value: number; min: number; max: number; step: number;
+  onChange: (next: number) => void;
+}): ReactNode {
+  const [text, setText] = useState(String(value));
+
+  useEffect(() => {
+    setText(String(value));
+  }, [value]);
+
+  return createElement('div', { className: 'imqb2-field' },
+    createElement('span', { className: 'imqb2-label' }, label),
+    createElement('input', {
+      className: 'imqb2-input', type: 'number', inputMode: 'numeric',
+      min, max, step, value: text, spellCheck: false,
+      onChange: (event: ChangeEvent<HTMLInputElement>) => {
+        const next = event.currentTarget.value;
+        setText(next);
+        if (next.trim() === '') return;
+        const parsed = Number(next);
+        if (Number.isFinite(parsed)) onChange(parsed);
+      },
+    }),
+    help === undefined ? null : createElement('p', { className: 'imqb2-hint' }, help),
+  );
+}
+
 /** 多行文本行 */
 function AreaRow({ label, help, value, rows, onChange }: {
   label: string; help?: string; value: string; rows?: number; onChange: (next: string) => void;
@@ -364,9 +393,18 @@ export function ConfigPanel(props?: { bindPhase?: string }): ReactNode {
     createElement('div', { className: 'imqb2-group-title' }, '基础设置'),
     createElement(SwitchRow, {
       label: '群聊仅回复 @机器人的消息', checked: form.requireMention ?? true,
-      help: '开启后，机器人仅可回复 @机器人的群聊消息',
+      help: '开启后，机器人仅可回复 @机器人的群聊消息；关闭后按下方间隔合并回复',
       onChange: (v) => { patch('requireMention', v); },
     }),
+    form.requireMention === false
+      ? createElement(NumberRow, {
+          label: '群历史定时发送间隔（秒）',
+          value: form.historyIntervalTimer ?? 180,
+          min: 30, max: 3600, step: 1,
+          help: '仅关闭「群聊仅回复 @机器人」时生效；30–3600 秒，默认 180',
+          onChange: (v) => { patch('historyIntervalTimer', v); },
+        })
+      : null,
     createElement(SwitchRow, {
       label: '流式输出', checked: form.streaming ?? true,
       help: '回复内容分段实时推送到聊天',
